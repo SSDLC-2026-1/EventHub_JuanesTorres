@@ -8,6 +8,8 @@ from flask import Flask, render_template, request, abort, url_for, redirect
 from pathlib import Path
 import json
 
+from validation_Sara import validate_payment_form
+
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
@@ -313,7 +315,9 @@ def checkout(event_id: int):
             qty=qty,
             subtotal=subtotal,
             service_fee=service_fee,
-            total=total
+            total=total,
+            errors={},
+            form_data={}
         )
 
     card_number = request.form.get("card_number", "")
@@ -321,6 +325,29 @@ def checkout(event_id: int):
     cvv = request.form.get("cvv", "")
     name_on_card = request.form.get("name_on_card", "")
     billing_email = request.form.get("billing_email", "")
+
+    clean, errors = validate_payment_form(
+        card_number=card_number,
+        exp_date=exp_date,
+        cvv=cvv,
+        name_on_card=name_on_card,
+        billing_email=billing_email
+    )
+
+    form_data = {
+        "exp_date": clean.get("exp_date", ""),
+        "name_on_card": clean.get("name_on_card", ""),
+        "billing_email": clean.get("billing_email", ""),
+        "card_last4": clean.get("card_last4", "")
+    }
+
+    if errors:
+        return render_template(
+            "checkout.html",
+            event=event, qty=qty, subtotal=subtotal,
+            service_fee=service_fee, total=total,
+            errors=errors, form_data=form_data
+        ), 400
 
     orders = load_orders()
     order_id = next_order_id(orders)
