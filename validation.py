@@ -158,7 +158,7 @@ def validate_name_on_card(name_on_card: str) -> Tuple[str, str]:
     if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", value):
         return "", "Name must contain letters"
     return value, ""
-
+ #se supone que esto funciona
 
 # =============================
 # Orchestrator Function
