@@ -110,11 +110,13 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
 
     if not EXP_RE.match(exp_date):
         return "", "Expiration date must be in MM/YY format with valid month"
-
-
-
+    elif exp_date < datetime.utcnow().strftime("%m/%y"):
+        return "", "Card is expired"
+    elif exp_date > (datetime.utcnow().replace(year=datetime.utcnow().year + 7)).strftime("%m/%y"):
+        return "", "Expiration date is too big"
+    
     # TODO: Implement validation
-    return "", ""
+    return exp_date, ""
 
 
 def validate_cvv(cvv: str) -> Tuple[str, str]:
