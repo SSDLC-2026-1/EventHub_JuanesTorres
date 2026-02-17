@@ -83,7 +83,13 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
         - If invalid → return ("", "Error message")
         - If valid → return (all credit card digits, "")
     """
+    card_number = normalize_basic(card_number)
+    card_number = card_number.replace(" ", "").replace("-", "")
 
+    if not CARD_DIGITS_RE.match(card_number):
+        return "", "Card number must contain only digits beetween 13 and 19"
+    else:
+        return card_number, ""
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     """
@@ -101,6 +107,12 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     Returns:
         (normalized_exp_date, error_message)
     """
+
+    if not EXP_RE.match(exp_date):
+        return "", "Expiration date must be in MM/YY format with valid month"
+
+
+
     # TODO: Implement validation
     return "", ""
 
