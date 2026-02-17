@@ -118,22 +118,15 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
 
 
 def validate_cvv(cvv: str) -> Tuple[str, str]:
-    """
-    Validate CVV.
-
-    Requirements:
-    - Must contain only digits
-    - Must be exactly 3 or 4 digits
-    - Should NOT return the CVV value for storage
-
-    Input:
-        cvv (str)
-
-    Returns:
-        ("", error_message)
-        (always return empty clean value for security reasons)
-    """
-    # TODO: Implement validation
+    
+    cvv_clean = normalize_basic(cvv)
+    
+    if not cvv_clean.isdigit():
+        return "", "CVV must contain only digits"
+    
+    if len(cvv_clean) not in (3, 4):
+        return "", "CVV must be exactly 3 or 4 digits"
+    
     return "", ""
 
 
