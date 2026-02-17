@@ -147,8 +147,18 @@ def validate_billing_email(billing_email: str) -> Tuple[str, str]:
     Returns:
         (normalized_email, error_message)
     """
-    # TODO: Implement validation
-    return "", ""
+    email_clean = normalize_basic(billing_email).lower()
+    
+    if len(email_clean) > 254:
+        return "", "Email must not exceed 254 characters"
+    
+    if not email_clean:
+        return "", "Email cannot be empty"
+    
+    if not EMAIL_BASIC_RE.match(email_clean):
+        return "", "Email must match basic email"
+    
+    return email_clean, ""
 
 
 def validate_name_on_card(name_on_card: str) -> Tuple[str, str]:
