@@ -109,15 +109,13 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     """
 
     year = datetime.now().year
-    month = datetime.now().month
     exp_date_year = int(exp_date[-2:])
-    exp_date_month = int(exp_date[:2])
 
     if not EXP_RE.match(exp_date):
         return "", "Expiration date must be in MM/YY format with valid month"
-    elif exp_date_year < year and exp_date_month < month:
+    elif exp_date_year < year % 100:
         return "", "Card is expired"
-    elif exp_date_year > year + 7:
+    elif exp_date_year > (year % 100 + 7):
         return "", "Expiration date is too big"
     
     # TODO: Implement validation
