@@ -25,11 +25,11 @@ from typing import Tuple, Dict
 # =============================
 
 
-CARD_DIGITS_RE = re.compile(r"")     # digits only
-CVV_RE = re.compile(r"")             # 3 or 4 digits
-EXP_RE = re.compile(r"")             # MM/YY format
-EMAIL_BASIC_RE = re.compile(r"")     # basic email structure
-NAME_ALLOWED_RE = re.compile(r"")    # allowed name characters
+CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
+CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
+EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
+EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,254}$")     # basic email structure
+NAME_ALLOWED_RE = re.compile(r"^[a-zA-Z'-_\s]{2,60}$")    # allowed name characters
 
 
 # =============================
@@ -37,10 +37,8 @@ NAME_ALLOWED_RE = re.compile(r"")    # allowed name characters
 # =============================
 
 def normalize_basic(value: str) -> str:
-    """
-    Normalize input using NFKC and strip whitespace.
-    """
-    return unicodedata.normalize("NFKC", (value or "")).strip()
+    value = unicodedata.normalize("NFKC", (value or "")).strip()
+    return value
 
 
 def luhn_is_valid(number: str) -> bool:
@@ -85,8 +83,6 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
         - If invalid → return ("", "Error message")
         - If valid → return (all credit card digits, "")
     """
-    # TODO: Implement validation
-    return "", ""
 
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
