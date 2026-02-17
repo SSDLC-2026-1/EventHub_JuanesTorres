@@ -88,8 +88,8 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
 
     if not CARD_DIGITS_RE.match(card_number):
         return "", "Card number must contain only digits beetween 13 and 19"
-    else:
-        return card_number, ""
+    
+    return card_number, ""
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     """
