@@ -25,11 +25,13 @@ from typing import Tuple, Dict
 # =============================
 
 
+
 CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
 CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
 EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
 EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,254}$")     # basic email structure
 NAME_ALLOWED_RE = re.compile(r"^[a-zA-Z'-_\s]{2,60}$")    # allowed name characters
+
 
 
 # =============================
@@ -165,24 +167,16 @@ def validate_billing_email(billing_email: str) -> Tuple[str, str]:
 
 
 def validate_name_on_card(name_on_card: str) -> Tuple[str, str]:
-    """
-    Validate name on card.
-
-    Requirements:
-    - Normalize input
-    - Collapse multiple spaces
-    - Length between 2 and 60 characters
-    - Only letters (including accents), spaces, apostrophes, hyphens
-
-    Input:
-        name_on_card (str)
-
-    Returns:
-        (normalized_name, error_message)
-    """
-    # TODO: Implement validation
-    return "", ""
-
+    value = normalize_basic(name_on_card)
+    value = re.sub(r"\s+", " ", value)
+    if not (2 <= len(value) <= 60):
+        return "", "Name must be between 2 and 60 characters"
+    if not NAME_ALLOWED_RE.fullmatch(value):
+        return "", "Name contains invalid characters"
+    if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", value):
+        return "", "Name must contain letters"
+    return value, ""
+ #se supone que esto funciona
 
 # =============================
 # Orchestrator Function
