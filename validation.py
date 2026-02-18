@@ -25,11 +25,13 @@ from typing import Tuple, Dict
 # =============================
 
 
-CARD_DIGITS_RE = re.compile(r"")     # digits only
-CVV_RE = re.compile(r"")             # 3 or 4 digits
-EXP_RE = re.compile(r"")             # MM/YY format
-EMAIL_BASIC_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")  # basic email structure
-NAME_ALLOWED_RE = re.compile(r"")    # allowed name characters
+
+CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
+CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
+EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
+EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,254}$")     # basic email structure
+NAME_ALLOWED_RE = re.compile(r"^[a-zA-Z'-_\s]{2,60}$")    # allowed name characters
+
 
 
 # =============================
@@ -37,10 +39,8 @@ NAME_ALLOWED_RE = re.compile(r"")    # allowed name characters
 # =============================
 
 def normalize_basic(value: str) -> str:
-    """
-    Normalize input using NFKC and strip whitespace.
-    """
-    return unicodedata.normalize("NFKC", (value or "")).strip()
+    value = unicodedata.normalize("NFKC", (value or "")).strip()
+    return value
 
 
 def luhn_is_valid(number: str) -> bool:
@@ -85,9 +85,13 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
         - If invalid → return ("", "Error message")
         - If valid → return (all credit card digits, "")
     """
-    # TODO: Implement validation
-    return "", ""
+    card_number = normalize_basic(card_number)
+    card_number = card_number.replace(" ", "").replace("-", "")
 
+    if not CARD_DIGITS_RE.match(card_number):
+        return "", "Card number must contain only digits beetween 13 and 19"
+    
+    return card_number, ""
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     """
@@ -105,27 +109,31 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     Returns:
         (normalized_exp_date, error_message)
     """
+
+    year = datetime.now().year
+    exp_date_year = int(exp_date[-2:])
+
+    if not EXP_RE.match(exp_date):
+        return "", "Expiration date must be in MM/YY format with valid month"
+    elif exp_date_year < year % 100:
+        return "", "Card is expired"
+    elif exp_date_year > (year % 100 + 7):
+        return "", "Expiration date is too big"
+    
     # TODO: Implement validation
-    return "", ""
+    return exp_date, ""
 
 
 def validate_cvv(cvv: str) -> Tuple[str, str]:
-    """
-    Validate CVV.
-
-    Requirements:
-    - Must contain only digits
-    - Must be exactly 3 or 4 digits
-    - Should NOT return the CVV value for storage
-
-    Input:
-        cvv (str)
-
-    Returns:
-        ("", error_message)
-        (always return empty clean value for security reasons)
-    """
-    # TODO: Implement validation
+    
+    cvv_clean = normalize_basic(cvv)
+    
+    if not cvv_clean.isdigit():
+        return "", "CVV must contain only digits"
+    
+    if len(cvv_clean) not in (3, 4):
+        return "", "CVV must be exactly 3 or 4 digits"
+    
     return "", ""
 
 
@@ -144,8 +152,18 @@ def validate_billing_email(billing_email: str) -> Tuple[str, str]:
     Returns:
         (normalized_email, error_message)
     """
-    # TODO: Implement validation
-    return "", ""
+    email_clean = normalize_basic(billing_email).lower()
+    
+    if len(email_clean) > 254:
+        return "", "Email must not exceed 254 characters"
+    
+    if not email_clean:
+        return "", "Email cannot be empty"
+    
+    if not EMAIL_BASIC_RE.match(email_clean):
+        return "", "Email must match basic email"
+    
+    return email_clean, ""
 
 
 def validate_name_on_card(name_on_card: str) -> Tuple[str, str]:
