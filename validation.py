@@ -29,8 +29,8 @@ from typing import Tuple, Dict
 CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
 CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
 EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
-EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,254}$")     # basic email structure
-NAME_ALLOWED_RE = re.compile(r"^[a-zA-Z'-_\s]{2,60}$")    # allowed name characters
+EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,254}$")    # basic email structure
+NAME_ALLOWED_RE = re.compile(r"^[a-zA-ZÀ-ÖØ-öø-ÿ\s'\-]+$")    # allowed name characters
 
 
 
@@ -56,8 +56,21 @@ def luhn_is_valid(number: str) -> bool:
         True if valid according to Luhn algorithm
         False otherwise
     """
-    # TODO: Implement Luhn algorithm
-    pass
+    if not number.isdigit():
+        return False
+
+    total = 0
+    reversed_digits = number[::-1]
+    
+    for i, char in enumerate(reversed_digits):
+        digit = int(char)
+        if (i+1) % 2 == 0:
+            digit *= 2
+            if digit > 9:
+                digit -= 9
+        total += digit
+        
+    return total % 10 == 0
 
 
 # =============================
@@ -91,6 +104,9 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
     if not CARD_DIGITS_RE.match(card_number):
         return "", "Card number must contain only digits beetween 13 and 19"
     
+    if not luhn_is_valid(card_number):
+        return "", "Card number failed Luhn validation"
+    
     return card_number, ""
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
@@ -109,16 +125,20 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     Returns:
         (normalized_exp_date, error_message)
     """
+    exp_date = normalize_basic(exp_date)
+    exp_month = int(exp_date[:2])
+    exp_year = int(exp_date[-2:])
 
-    year = datetime.now().year
-    exp_date_year = int(exp_date[-2:])
+    now = datetime.utcnow()
+    year = now.year % 100
+    month = now.month
 
     if not EXP_RE.match(exp_date):
         return "", "Expiration date must be in MM/YY format with valid month"
-    elif exp_date_year < year % 100:
-        return "", "Card is expired"
-    elif exp_date_year > (year % 100 + 7):
-        return "", "Expiration date is too big"
+    elif exp_date < year or (exp_date == year and exp_month < month):
+        return "", "Card is expired D:, check the expiration date again"
+    elif exp_date > (year + 7):
+        return "", "Expiration date is unreal, are you sure the date is correct???"
     
     # TODO: Implement validation
     return exp_date, ""
@@ -134,7 +154,7 @@ def validate_cvv(cvv: str) -> Tuple[str, str]:
     if len(cvv_clean) not in (3, 4):
         return "", "CVV must be exactly 3 or 4 digits"
     
-    return "", ""
+    return "cvv_clean", ""
 
 
 def validate_billing_email(billing_email: str) -> Tuple[str, str]:
