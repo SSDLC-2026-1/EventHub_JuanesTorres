@@ -14,6 +14,22 @@ app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.secret_key = "dev-secret-change-me"
 
+# esta función protege rutas que requieren que el usuario haya iniciado sesión.
+from functools import wraps
+def require_login(role: Optional[str] = None):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if not user:
+                return redirect(url_for("login"))
+
+            if role and user.get("role") != role:
+                abort(403)
+
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 BASE_DIR = Path(__file__).resolve().parent
 EVENTS_PATH = BASE_DIR / "data" / "events.json"
@@ -348,16 +364,16 @@ def register():
     return redirect(url_for("login", registered="1"))
 
 @app.get("/dashboard")
+@require_login()  # Requiere sesión activa
 def dashboard():
-
 
     paid = request.args.get("paid") == "1"
     user = get_current_user()
     return render_template("dashboard.html", user_name=(user.get("full_name") if user else "User"), paid=paid)
 
 @app.route("/checkout/<int:event_id>", methods=["GET", "POST"])
+@require_login()  # Requiere sesión activa
 def checkout(event_id: int):
-
 
     events = load_events()
     event = next((e for e in events if e.id == event_id), None)
@@ -435,9 +451,9 @@ def checkout(event_id: int):
 
 
 @app.route("/profile", methods=["GET", "POST"])
+@require_login()  # Requiere sesión activa
 def profile():
  
-
     user = get_current_user()
     if not user:
         session.clear()
@@ -485,6 +501,7 @@ def profile():
         success_message=success_msg,
     )
 @app.get("/admin/users")
+@require_login(role="admin") #requiere iniciar sesión como ADMIN
 def admin_users():
 
     q = (request.args.get("q") or "").strip().lower()
@@ -523,6 +540,7 @@ def admin_users():
     )
 
 @app.post("/admin/users/<int:user_id>/toggle")
+@require_login(role="admin")
 def admin_toggle_user(user_id: int):
     users = load_users()
     for u in users:
@@ -534,6 +552,7 @@ def admin_toggle_user(user_id: int):
     return redirect(url_for("admin_users"))
 
 @app.post("/admin/users/<int:user_id>/role")
+@require_login(role="admin")
 def admin_change_role(user_id: int):
     new_role = request.form.get("role", "user")
 
