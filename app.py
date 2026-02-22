@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 
 from flask import Flask, render_template, request, abort, url_for, redirect, session
@@ -21,6 +21,11 @@ USERS_PATH = BASE_DIR / "data" / "users.json"
 ORDERS_PATH = BASE_DIR / "data" / "orders.json"
 CATEGORIES = ["All", "Music", "Tech", "Sports", "Business"]
 CITIES = ["Any", "New York", "San Francisco", "Berlin", "London", "Oakland", "San Jose"]
+
+# Variables Globales y diccionario para registar los intentos de registros para el Lab1 :D
+Max_failed_attempts = 3
+Lockout_duration_min = 5
+Failed_attempts: dict[str, dict[str, int]] = {}
 
 
 @dataclass(frozen=True)
@@ -258,15 +263,51 @@ def login():
             field_errors=field_errors,
             form={"email": email},
         ), 400
+    
+    # Condicional para registrar al usuario al diccionario de intentos fallidos inicializado en 0
+    if email not in Failed_attempts:
+        Failed_attempts[email] = {"intentos": 0, "tiempoBloqueo": None}
+
+    F_attempst = Failed_attempts[email]
+
+    # Condicioanl que ayuda a revisar si el usurario esta bloqueado temporalmente
+    if F_attempst["tiempoBloqueo"]:
+        if datetime.utcnow() < F_attempst["tiempoBloqueo"]:
+            minutes, seconds = divmod(int((F_attempst["tiempoBloqueo"] - datetime.utcnow()).total_seconds()), 60)
+            return render_template(
+                "login.html",
+                error=f"Account locked due to multiple failed attempts. Try again in {minutes}m {seconds}s.",
+                field_errors={"email": " ", "password": " "},
+                form={"email": email},
+            ), 403
+        else:
+            F_attempst["intentos"] = 0
+            F_attempst["tiempoBloqueo"] = None
 
     user = find_user_by_email(email)
+    
+    # Condicional para sumar los intentos en caso de equivocarse al inciar sesion
     if not user or user.get("password") != password:
-        return render_template(
-            "login.html",
-            error="Invalid credentials.",
-            field_errors={"email": " ", "password": " "},
-            form={"email": email},
-        ), 401
+        F_attempst["intentos"] += 1
+        if F_attempst["intentos"] >= Max_failed_attempts:
+            F_attempst["tiempoBloqueo"] = datetime.utcnow() + timedelta(minutes=Lockout_duration_min)
+            return render_template(
+                "login.html",
+                error=f"Account locked due to multiple failed attempts. Try again in {Lockout_duration_min}m.",
+                field_errors={"email": " ", "password": " "},
+                form={"email": email},
+            ), 403
+        else:
+            attempts = Max_failed_attempts - F_attempst["intentos"]
+            return render_template(
+                "login.html",
+                error=f"Invalid credentials. {attempts} attempts left before lockout D:",
+                field_errors={"email": " ", "password": " "},
+                form={"email": email},
+            ), 401
+        
+    F_attempst["intentos"] = 0
+    F_attempst["tiempoBloqueo"] = None
 
     session["user_email"] = (user.get("email") or "").strip().lower()
 
