@@ -135,9 +135,9 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
 
     if not EXP_RE.match(exp_date):
         return "", "Expiration date must be in MM/YY format with valid month"
-    elif exp_date < year or (exp_date == year and exp_month < month):
+    elif exp_year < year or (exp_year == year and exp_month < month):
         return "", "Card is expired D:, check the expiration date again"
-    elif exp_date > (year + 7):
+    elif exp_year > (year + 7):
         return "", "Expiration date is unreal, are you sure the date is correct???"
     
     # TODO: Implement validation
@@ -154,7 +154,7 @@ def validate_cvv(cvv: str) -> Tuple[str, str]:
     if len(cvv_clean) not in (3, 4):
         return "", "CVV must be exactly 3 or 4 digits"
     
-    return "cvv_clean", ""
+    return cvv_clean, ""
 
 
 def validate_billing_email(billing_email: str) -> Tuple[str, str]:
