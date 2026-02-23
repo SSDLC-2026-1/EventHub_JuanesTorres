@@ -280,6 +280,9 @@ def login():
             form={"email": email},
         ), 400
     
+    # Normalizamos el correo para evitar conflictos con correos con mayusculas
+    email = email.strip().lower()
+    
     # Condicional para registrar al usuario al diccionario de intentos fallidos inicializado en 0
     if email not in Failed_attempts:
         Failed_attempts[email] = {"intentos": 0, "tiempoBloqueo": None}
@@ -326,8 +329,14 @@ def login():
     F_attempst["tiempoBloqueo"] = None
 
     session["user_email"] = (user.get("email") or "").strip().lower()
+    session["user_role"] = user.get("role", "user")
 
     return redirect(url_for("dashboard"))
+
+@app.route("/logout")
+def logout():
+    session.clear() 
+    return redirect(url_for("index"))
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
