@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
@@ -272,6 +274,12 @@ def login():
     if not password.strip():
         field_errors["password"] = "Password is required."
 
+    email = email.strip().lower()
+    email_re = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
+    if email and not email_re.match(email):
+        field_errors["email"] = "Invalid email format."
+
     if field_errors:
         return render_template(
             "login.html",
@@ -476,6 +484,7 @@ def profile():
 
     field_errors = {}  
     success_msg = None
+    error_msg = None
 
     if request.method == "POST":
         full_name = request.form.get("full_name", "")
@@ -488,6 +497,63 @@ def profile():
         users = load_users()
         email_norm = (user.get("email") or "").strip().lower()
 
+        name_re = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$") # Condiciones para el nombre
+        phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
+
+        # Validar nombre
+        full_name = re.sub(r"\s+", " ", full_name.strip())
+        if not full_name or not name_re.match(full_name):
+            field_errors["full_name"] = "Name must be 2-60 characters and must contain letters, spaces, apostrophes, or hyphens."
+
+        # Validar Teléfono
+        phone = phone.replace(" ", "") 
+        if not phone or not phone_re.match(phone):
+            field_errors["phone"] = "Phone must contain only numbers between 7 and 15 digits."
+
+        # Validar Cambio de Contraseña
+        if current_password or new_password or confirm_new_password:
+            # Verificar contraseña actual
+            if current_password != user.get("password"):
+                field_errors["current_password"] = "Incorrect current password."
+            else:
+            # Validar nueva contraseña
+                if not new_password:
+                    field_errors["new_password"] = "New password is required."
+                elif len(new_password) < 8 or len(new_password) > 64:
+                    field_errors["new_password"] = "Password must be between 8 and 64 characters."
+                elif re.search(r"\s", new_password):
+                    field_errors["new_password"] = "Password cannot contain spaces."
+                elif not re.search(r"[A-Z]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one uppercase letter."
+                elif not re.search(r"[a-z]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one lowercase letter."
+                elif not re.search(r"\d", new_password):
+                    field_errors["new_password"] = "Password must contain at least one number."
+                elif not re.search(r"[!@#$%^&*()\-_=+\[\]{}<>?]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one special character."
+                elif new_password == user.get("email"):
+                    field_errors["new_password"] = "New password cannot be the same as your email."
+                elif new_password == full_name:
+                    field_errors["new_password"] = "New password cannot be the same as your name."
+                elif new_password == phone:
+                    field_errors["new_password"] = "New password cannot be the same as your phone number." 
+                elif new_password == current_password:
+                    field_errors["new_password"] = "New password cannot be the same as the current password."        
+                elif new_password != confirm_new_password:
+                    field_errors["confirm_new_password"] = "New passwords do not match."
+
+        form["full_name"] = full_name
+        form["phone"] = phone
+
+        if field_errors:
+            error_msg = "Please fix the highlighted fields to update your profile."
+            return render_template(
+                "profile.html",
+                form=form,
+                field_errors=field_errors,
+                error=error_msg 
+            ), 400
+        
         for u in users:
             if (u.get("email") or "").strip().lower() == email_norm:
                 u["full_name"] = full_name
@@ -509,6 +575,7 @@ def profile():
         field_errors=field_errors,
         success_message=success_msg,
     )
+
 @app.get("/admin/users")
 @require_login(role="admin") #requiere iniciar sesión como ADMIN
 def admin_users():

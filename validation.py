@@ -126,6 +126,10 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
         (normalized_exp_date, error_message)
     """
     exp_date = normalize_basic(exp_date)
+
+    if not EXP_RE.match(exp_date):
+        return "", "Expiration date must be in MM/YY format with valid month"
+    
     exp_month = int(exp_date[:2])
     exp_year = int(exp_date[-2:])
 
@@ -133,9 +137,7 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     year = now.year % 100
     month = now.month
 
-    if not EXP_RE.match(exp_date):
-        return "", "Expiration date must be in MM/YY format with valid month"
-    elif exp_year < year or (exp_year == year and exp_month < month):
+    if exp_year < year or (exp_year == year and exp_month < month):
         return "", "Card is expired D:, check the expiration date again"
     elif exp_year > (year + 7):
         return "", "Expiration date is unreal, are you sure the date is correct???"
