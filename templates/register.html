@@ -20,46 +20,61 @@
         <div class="auth-banner auth-banner-error">{{ error }}</div>
     {% endif %}
 
-    <form class="auth-form" method="post" action="{{ url_for('register') }}">
+    <form class="auth-form" method="post" action="{{ url_for('register') }}"> 
       <label class="auth-label" for="full_name">Full Name</label>
-      <div class="auth-input">
+      <div class="auth-input {% if field_errors and field_errors.get('full_name') %}has-error{% endif %}">
         <span class="auth-icon">👤</span>
-        <input id="full_name" name="full_name" type="text" placeholder="John Doe" />
+        <input id="full_name" name="full_name" type="text" placeholder="John Doe" value="{{ form.full_name if form else '' }}" />
       </div>
+      {% if field_errors and field_errors.get('full_name') %}
+        <div class="auth-help auth-help-error">{{ field_errors.get('full_name') }}</div>
+      {% endif %}
 
       <label class="auth-label" for="email">Email</label>
-      <div class="auth-input">
+      <div class="auth-input {% if field_errors and field_errors.get('email') %}has-error{% endif %}">
         <span class="auth-icon">✉️</span>
-        <input id="email" name="email" type="email" placeholder="john.doe@example.com" />
+        <input id="email" name="email" type="email" placeholder="john.doe@example.com" value="{{ form.email if form else '' }}" />
       </div>
+      {% if field_errors and field_errors.get('email') %}
+        <div class="auth-help auth-help-error">{{ field_errors.get('email') }}</div>
+      {% endif %}
 
       <label class="auth-label" for="phone">Phone Number</label>
-      <div class="auth-input">
+      <div class="auth-input {% if field_errors and field_errors.get('phone') %}has-error{% endif %}">
         <span class="auth-icon">📞</span>
-        <input id="phone" name="phone" type="tel" placeholder="(+1) 555-123-4567" />
+        <input id="phone" name="phone" type="tel" placeholder="(+1) 555-123-4567" value="{{ form.phone if form else '' }}" />
       </div>
+      {% if field_errors and field_errors.get('phone') %}
+        <div class="auth-help auth-help-error">{{ field_errors.get('phone') }}</div>
+      {% endif %}
 
       <label class="auth-label" for="password">Password</label>
-      <div class="auth-input">
+      <div class="auth-input {% if field_errors and field_errors.get('password') %}has-error{% endif %}">
         <span class="auth-icon">🔒</span>
         <input id="password" name="password" type="password" placeholder="••••••••" />
         <span class="auth-eye">👁️</span>
       </div>
+      {% if field_errors and field_errors.get('password') %}
+        <div class="auth-help auth-help-error">{{ field_errors.get('password') }}</div>
+      {% endif %}
 
       <label class="auth-label" for="confirm_password">Confirm Password</label>
-      <div class="auth-input">
+      <div class="auth-input {% if field_errors and field_errors.get('confirm_password') %}has-error{% endif %}">
         <span class="auth-icon">🔒</span>
         <input id="confirm_password" name="confirm_password" type="password" placeholder="••••••••" />
         <span class="auth-eye">👁️</span>
       </div>
+      {% if field_errors and field_errors.get('confirm_password') %}
+        <div class="auth-help auth-help-error">{{ field_errors.get('confirm_password') }}</div>
+      {% endif %}
 
       <div class="auth-rules">
         <div class="auth-rules-title">Password must:</div>
         <ul class="auth-rules-list muted small">
-          <li>?</li>
-          <li>?</li>
-          <li>?</li>
-          <li>?</li>
+          <li>Be 8-64 characters long</li>
+          <li>Have upper & lower case letters</li>
+          <li>Include at least one number</li>
+          <li>Have a special character (e.g., !@#$%)</li>
         </ul>
       </div>
 
