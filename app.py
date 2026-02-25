@@ -357,10 +357,59 @@ def register():
     password = request.form.get("password", "")
     confirm_password = request.form.get("confirm_password", "")
 
-    if user_exists(email):
+    field_errors = {}
+
+    name_re = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$") # Condiciones para el nombre
+    email_re = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$") # Condiciones para el correo
+    phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
+
+    # Validar nombre
+    full_name = re.sub(r"\s+", " ", full_name.strip())
+    if not full_name or not name_re.match(full_name):
+        field_errors["full_name"] = "Name must be 2-60 characters and must contain letters, spaces, apostrophes, or hyphens."
+
+    # Validar email
+    email = email.strip().lower()
+    if not email or len(email) > 254 or not email_re.match(email):
+        field_errors["email"] = "Please enter a valid email address."
+    elif user_exists(email): 
+        field_errors["email"] = "This email is already registered. Try signing in."
+
+    # Validar teléfono
+    phone = phone.replace(" ", "") 
+    if not phone or not phone_re.match(phone):
+        field_errors["phone"] = "Phone must contain only numbers between 7 and 15 digits."
+
+    # Validar contraseña
+    if not password:
+        field_errors["password"] = "Password is required."
+    elif len(password) < 8 or len(password) > 64:
+        field_errors["password"] = "Password must be between 8 and 64 characters."
+    elif re.search(r"\s", password):
+        field_errors["password"] = "Password cannot contain spaces."
+    elif not re.search(r"[A-Z]", password):
+        field_errors["password"] = "Password must contain at least one uppercase letter."
+    elif not re.search(r"[a-z]", password):
+        field_errors["password"] = "Password must contain at least one lowercase letter."
+    elif not re.search(r"\d", password):
+        field_errors["password"] = "Password must contain at least one number."
+    elif not re.search(r"[!@#$%^&*()\-_=+\[\]{}<>?]", password):
+        field_errors["password"] = "Password must contain at least one special character."
+    elif password == email: 
+        field_errors["password"] = "Password cannot be the same as your email."
+    elif password == full_name:
+        field_errors["password"] = "Password cannot be the same as your name."
+    elif password == phone:
+        field_errors["password"] = "Password cannot be the same as your phone number."
+    elif password != confirm_password:
+        field_errors["confirm_password"] = "Passwords are different, please check them again."
+
+    if field_errors:
         return render_template(
             "register.html",
-            error="This email is already registered. Try signing in."
+            error="Please check your information and correct the fields D:",
+            field_errors=field_errors,
+            form={"full_name": full_name, "email": email, "phone": phone} 
         ), 400
 
     users = load_users()
@@ -368,12 +417,12 @@ def register():
 
     users.append({
         "id": next_id,
-        "full_name": full_name,
-        "email": email,
-        "phone": phone,
+        "full_name": full_name, 
+        "email": email,         
+        "phone": phone,         
         "password": password,
         "role": "user",          
-        "status": "active",
+        "status": "active",     
     })
 
     save_users(users)
