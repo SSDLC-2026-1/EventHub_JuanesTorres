@@ -341,10 +341,11 @@ def login():
 
     return redirect(url_for("dashboard"))
 
-@app.route("/logout")
+@app.route("/logout") 
 def logout():
     session.clear() 
     return redirect(url_for("index"))
+# :p 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
