@@ -48,19 +48,6 @@ def encrypt_aes(texto, clave):
 def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
     """
     Descifra texto cifrado con AES-EAX.
-
-    Debes:
-
-    1. Convertir texto_cifrado_hex, nonce_hex y tag_hex a bytes.
-    2. Crear el objeto AES usando:
-           AES.new(clave, AES.MODE_EAX, nonce=nonce)
-    3. Usar decrypt_and_verify() para validar integridad.
-    4. Retornar el texto descifrado como string.
-    """
-
-def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
-    """
-    Descifra texto cifrado con AES-EAX.
     """
     # 1. Convertir texto_cifrado_hex, nonce_hex y tag_hex a bytes.
     texto_cifrado = bytes.fromhex(texto_cifrado_hex)
