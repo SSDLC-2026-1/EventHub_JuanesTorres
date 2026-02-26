@@ -45,6 +45,7 @@ def encrypt_aes(texto, clave):
         tag.hex()
     )
 
+
 def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
     """
     Descifra texto cifrado con AES-EAX.
@@ -58,31 +59,26 @@ def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
     4. Retornar el texto descifrado como string.
     """
 
-def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
-    """
-    Descifra texto cifrado con AES-EAX.
-    """
-    # 1. Convertir texto_cifrado_hex, nonce_hex y tag_hex a bytes.
-    texto_cifrado = bytes.fromhex(texto_cifrado_hex)
-    nonce = bytes.fromhex(nonce_hex)
-    tag = bytes.fromhex(tag_hex)
+    # TODO: Implementar conversión de hex a bytes
+    byte_tex_cif = bytes.fromhex(texto_cifrado_hex)
+    byte_nonce = bytes.fromhex(nonce_hex)
+    byte_tag = bytes.fromhex(tag_hex)
 
-    # 2. Crear el objeto AES usando AES.new(clave, AES.MODE_EAX, nonce=nonce)
-    cipher = AES.new(clave, AES.MODE_EAX, nonce=nonce)
+    # TODO: Crear objeto AES con nonce
+    objeto = AES.new(clave, AES.MODE_EAX, nonce=byte_nonce)
 
-    try:
-        # 3. Usar decrypt_and_verify() para validar integridad.
-        texto_descifrado_bytes = cipher.decrypt_and_verify(texto_cifrado, tag)
-        
-        # 4. Retornar el texto descifrado como string.
-        return texto_descifrado_bytes.decode('utf-8')
-    except ValueError:
-        return "Error: La integridad del mensaje fue comprometida o la clave es incorrecta."
+    # TODO: Usar decrypt_and_verify
+    texto_plano = objeto.decrypt_and_verify(byte_tex_cif, byte_tag)
 
+    # TODO: Convertir resultado a string y retornar
+    return texto_plano.decode()
+
+    pass
 
 # ==========================================================
 # PASSWORD HASHING (PBKDF2 - SHA256)
 # ==========================================================
+
 
 def hash_password(password):
     """
@@ -107,27 +103,26 @@ def hash_password(password):
     Pista:
         hashlib.pbkdf2_hmac(...)
     """
-    # 1. Generar salt aleatoria de 16 bytes.
-    salt = get_random_bytes(16)
     
-    # Usar al menos 200000 iteraciones (Estándar seguro actual)
-    iterations = 210000
+    # TODO: Generar salt aleatoria
+    # Parámetros
+    algorithm = "pbkdf2_sha256"
+    iterations = 200_000
+    salt = os.urandom(16)  # 16 bytes aleatorios
 
-    # 2. Derivar clave usando pbkdf2_hmac
-    hash_bytes = hashlib.pbkdf2_hmac(
-        'sha256', 
-        password.encode('utf-8'), 
-        salt, 
-        iterations
-    )
+    # TODO: Derivar clave usando pbkdf2_hmac
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations, dklen=32)
 
-    # 3. Retornar diccionario con salt y hash en formato hex
+    # TODO: Retornar diccionario con salt y hash en formato hex
     return {
-        "algorithm": "pbkdf2_sha256",
+        "algorithm": algorithm,
         "iterations": iterations,
         "salt": salt.hex(),
-        "hash": hash_bytes.hex()
+        "hash": dk.hex()
     }
+    pass
+
+
 
 def verify_password(password, stored_data):
     """
@@ -150,26 +145,20 @@ def verify_password(password, stored_data):
             "hash": "..."
         }
     """
-    # 1. Extraer salt y iterations del diccionario.
-    salt_hex = stored_data["salt"]
-    iterations = stored_data["iterations"]
-    stored_hash_hex = stored_data["hash"]
 
-    # 2. Convertir salt de hex a bytes.
-    salt_bytes = bytes.fromhex(salt_hex)
+    # TODO: Extraer salt e iterations
+    v_iterations = stored_data["iterations"]
+    v_salt_hex = stored_data["salt"]
+    v_stored_hash_hex = stored_data["hash"]
 
-    # 3. Recalcular el hash con la contraseña ingresada.
-    recalculated_hash_bytes = hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode('utf-8'),
-        salt_bytes,
-        iterations
-    )
-    
-    recalculated_hash_hex = recalculated_hash_bytes.hex()
+    # TODO: Recalcular hash
+    v_salt = bytes.fromhex(v_salt_hex)
+    new_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), v_salt, v_iterations, dklen=32)
+    # TODO: Comparar con compare_digest
+    return hmac.compare_digest(new_hash.hex(), v_stored_hash_hex)
+    pass
 
-    # 4. Comparar usando hmac.compare_digest() para evitar ataques de tiempo (Timing attacks)
-    return hmac.compare_digest(recalculated_hash_hex, stored_hash_hex)
+
 
 if __name__ == "__main__":
 
@@ -184,7 +173,7 @@ if __name__ == "__main__":
     print("Nonce:", nonce)
     print("Tag:", tag)
 
-    # Prueba de descifrado descomentada
+    # Cuando implementen decrypt_aes, esto debe funcionar
     texto_descifrado = decrypt_aes(texto_cifrado, nonce, tag, clave)
     print("Texto descifrado:", texto_descifrado)
 
@@ -193,10 +182,10 @@ if __name__ == "__main__":
 
     password = "Password123!"
 
-    # Prueba de hash descomentada
+    # Cuando implementen hash_password:
     pwd_data = hash_password(password)
     print("Hash generado:", pwd_data)
 
-    # Prueba de verificación descomentada
-    print("Verificación correcta (misma contraseña):", verify_password("Password123!", pwd_data))
-    print("Verificación incorrecta (mala contraseña):", verify_password("Password1234!", pwd_data))
+    # Cuando implementen verify_password:
+    print("Verificación correcta:",
+           verify_password("Password123!", pwd_data))
