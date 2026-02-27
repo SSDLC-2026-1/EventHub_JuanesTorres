@@ -147,6 +147,7 @@ def verify_password(password, stored_data):
     """
 
     # TODO: Extraer salt e iterations
+    print("******",stored_data)
     v_iterations = stored_data["iterations"]
     v_salt_hex = stored_data["salt"]
     v_stored_hash_hex = stored_data["hash"]

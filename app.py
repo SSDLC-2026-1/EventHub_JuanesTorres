@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 
 from validation import validate_payment_form
+import encryption
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -266,6 +267,7 @@ def login():
 
     email = request.form.get("email", "")
     password = request.form.get("password", "")
+    haash_password = encryption.hash_password(password)
 
     field_errors = {}
 
@@ -313,8 +315,8 @@ def login():
 
     user = find_user_by_email(email)
     
-    # Condicional para sumar los intentos en caso de equivocarse al inciar sesion
-    if not user or user.get("password") != password:
+    # Condicional para sumar los intentos en caso de equivocarse al iniciar sesión
+    if not user or not encryption.verify_password(haash_password, "data/users.json"): 
         F_attempst["intentos"] += 1
         if F_attempst["intentos"] >= Max_failed_attempts:
             F_attempst["tiempoBloqueo"] = datetime.utcnow() + timedelta(minutes=Lockout_duration_min)
@@ -415,13 +417,14 @@ def register():
 
     users = load_users()
     next_id = (max([u.get("id", 0) for u in users], default=0) + 1)
+    hash_password = encryption.hash_password(password)
 
     users.append({
         "id": next_id,
         "full_name": full_name, 
         "email": email,         
         "phone": phone,         
-        "password": password,
+        "password": hash_password,
         "role": "user",          
         "status": "active",     
     })

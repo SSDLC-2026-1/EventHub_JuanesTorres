@@ -16,5 +16,19 @@
     "password": "L@vidaescolorderosa1245",
     "role": "user",
     "status": "active"
+  },
+  {
+    "id": 3,
+    "full_name": "pedro",
+    "email": "pedro@correo.co",
+    "phone": "3212121212",
+    "password": {
+      "algorithm": "pbkdf2_sha256",
+      "iterations": 200000,
+      "salt": "c28b12f57199339776b0ac3557c3014b",
+      "hash": "445ee205f31023099ccae48a92842b84a92fec553c60e62b3c3a48bcfc88f151"
+    },
+    "role": "user",
+    "status": "active"
   }
 ]
