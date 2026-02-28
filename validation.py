@@ -29,8 +29,8 @@ from typing import Tuple, Dict
 CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
 CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
 EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
-EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,254}$")    # basic email structure
-NAME_ALLOWED_RE = re.compile(r"^[a-zA-ZÀ-ÖØ-öø-ÿ\s'\-]+$")    # allowed name characters
+EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")    # basic email structure
+NAME_ALLOWED_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$")    # allowed name characters
 
 
 
@@ -156,7 +156,7 @@ def validate_cvv(cvv: str) -> Tuple[str, str]:
     if len(cvv_clean) not in (3, 4):
         return "", "CVV must be exactly 3 or 4 digits"
     
-    return cvv_clean, ""
+    return "", ""
 
 
 def validate_billing_email(billing_email: str) -> Tuple[str, str]:

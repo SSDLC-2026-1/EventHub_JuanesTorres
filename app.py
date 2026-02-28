@@ -10,8 +10,8 @@ from flask import Flask, render_template, request, abort, url_for, redirect, ses
 from pathlib import Path
 import json
 
-from validation import validate_payment_form
-import encryption
+from validation import validate_payment_form, validate_name_on_card, validate_billing_email, normalize_basic
+from encryption import hash_password, verify_password
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -267,7 +267,6 @@ def login():
 
     email = request.form.get("email", "")
     password = request.form.get("password", "")
-    haash_password = encryption.hash_password(password)
 
     field_errors = {}
 
@@ -276,11 +275,9 @@ def login():
     if not password.strip():
         field_errors["password"] = "Password is required."
 
-    email = email.strip().lower()
-    email_re = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
-
-    if email and not email_re.match(email):
-        field_errors["email"] = "Invalid email format."
+    email, err = validate_billing_email(email)
+    if err:
+        field_errors["email"] = err
 
     if field_errors:
         return render_template(
@@ -316,7 +313,7 @@ def login():
     user = find_user_by_email(email)
     
     # Condicional para sumar los intentos en caso de equivocarse al iniciar sesión
-    if not user or not encryption.verify_password(haash_password, "data/users.json"): 
+    if not user or not verify_password(password, user.get("password", "")): 
         F_attempst["intentos"] += 1
         if F_attempst["intentos"] >= Max_failed_attempts:
             F_attempst["tiempoBloqueo"] = datetime.utcnow() + timedelta(minutes=Lockout_duration_min)
@@ -362,24 +359,21 @@ def register():
 
     field_errors = {}
 
-    name_re = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$") # Condiciones para el nombre
-    email_re = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$") # Condiciones para el correo
     phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
 
     # Validar nombre
-    full_name = re.sub(r"\s+", " ", full_name.strip())
-    if not full_name or not name_re.match(full_name):
-        field_errors["full_name"] = "Name must be 2-60 characters and must contain letters, spaces, apostrophes, or hyphens."
+    full_name, err = validate_name_on_card(full_name)
+    if err: 
+        field_errors["full_name"] = err
 
-    # Validar email
-    email = email.strip().lower()
-    if not email or len(email) > 254 or not email_re.match(email):
-        field_errors["email"] = "Please enter a valid email address."
-    elif user_exists(email): 
+    email, err = validate_billing_email(email)
+    if err: 
+        field_errors["email"] = err
+    elif user_exists(email):
         field_errors["email"] = "This email is already registered. Try signing in."
 
     # Validar teléfono
-    phone = phone.replace(" ", "") 
+    phone = normalize_basic(phone).replace(" ", "")
     if not phone or not phone_re.match(phone):
         field_errors["phone"] = "Phone must contain only numbers between 7 and 15 digits."
 
@@ -417,14 +411,14 @@ def register():
 
     users = load_users()
     next_id = (max([u.get("id", 0) for u in users], default=0) + 1)
-    hash_password = encryption.hash_password(password)
+    h_password = hash_password(password)
 
     users.append({
         "id": next_id,
         "full_name": full_name, 
         "email": email,         
         "phone": phone,         
-        "password": hash_password,
+        "password": h_password,
         "role": "user",          
         "status": "active",     
     })
@@ -550,14 +544,13 @@ def profile():
         users = load_users()
         email_norm = (user.get("email") or "").strip().lower()
 
-        name_re = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$") # Condiciones para el nombre
         phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
 
         # Validar nombre
-        full_name = re.sub(r"\s+", " ", full_name.strip())
-        if not full_name or not name_re.match(full_name):
-            field_errors["full_name"] = "Name must be 2-60 characters and must contain letters, spaces, apostrophes, or hyphens."
-
+        full_name, err = validate_name_on_card(full_name)
+        if err: 
+            field_errors["full_name"] = err
+        
         # Validar Teléfono
         phone = phone.replace(" ", "") 
         if not phone or not phone_re.match(phone):
@@ -566,7 +559,7 @@ def profile():
         # Validar Cambio de Contraseña
         if current_password or new_password or confirm_new_password:
             # Verificar contraseña actual
-            if current_password != user.get("password"):
+            if not verify_password(current_password, user.get("password")):
                 field_errors["current_password"] = "Incorrect current password."
             else:
             # Validar nueva contraseña
@@ -613,6 +606,7 @@ def profile():
                 u["phone"] = phone
 
                 if new_password:
+                    new_password = hash_password(new_password)
                     u["password"] = new_password
                 break
 

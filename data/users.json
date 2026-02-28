@@ -30,5 +30,19 @@
     },
     "role": "user",
     "status": "active"
+  },
+  {
+    "id": 4,
+    "full_name": "Jhonny Thampson",
+    "email": "jhonnyloko@correo.com",
+    "phone": "3212121212",
+    "password": {
+      "algorithm": "pbkdf2_sha256",
+      "iterations": 200000,
+      "salt": "b8e957c0ec70ce16942ac43bafe34be9",
+      "hash": "4310a31fea6fb8335a1f0695ed08451b5b323199cd437fdc40692e21d18f392f"
+    },
+    "role": "user",
+    "status": "active"
   }
 ]
