@@ -11,7 +11,7 @@ from pathlib import Path
 import json
 
 from validation import validate_payment_form, validate_name_on_card, validate_billing_email, normalize_basic
-from encryption import hash_password, verify_password
+from encryption import hash_password, verify_password, encrypt_aes, decrypt_aes
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -46,6 +46,8 @@ Max_failed_attempts = 3
 Lockout_duration_min = 5
 Failed_attempts: dict[str, dict[str, int]] = {}
 
+# Llave global para AES
+Key = b"LlaveGlobalDe32Bytes0123456789!!"
 
 @dataclass(frozen=True)
 class Event:
@@ -413,11 +415,18 @@ def register():
     next_id = (max([u.get("id", 0) for u in users], default=0) + 1)
     h_password = hash_password(password)
 
+    tel_cifrado, tel_nonce, tel_tag = encrypt_aes(phone, Key)
+    e_phone = {
+        "cifrado": tel_cifrado,
+        "nonce": tel_nonce,
+        "tag": tel_tag
+    }
+
     users.append({
         "id": next_id,
         "full_name": full_name, 
         "email": email,         
-        "phone": phone,         
+        "phone": e_phone,         
         "password": h_password,
         "role": "user",          
         "status": "active",     
@@ -476,10 +485,17 @@ def checkout(event_id: int):
         billing_email=billing_email
     )
 
+    email_cifrado, email_nonce, email_tag = encrypt_aes(clean.get("billing_email", ""), Key)
+    e_email = {
+        "cifrado": email_cifrado,
+        "nonce": email_nonce,
+        "tag": email_tag
+    }
+
     form_data = {
         "exp_date": clean.get("exp_date", ""),
         "name_on_card": clean.get("name_on_card", ""),
-        "billing_email": clean.get("billing_email", ""),
+        "billing_email": e_email,
         "card": clean.get("card", "")
     }
 
@@ -522,11 +538,16 @@ def profile():
     if not user:
         session.clear()
         return redirect(url_for("login"))
-
+    
+    phone = user.get("phone")
+    
+    if isinstance(phone, dict):
+        phone = decrypt_aes(phone.get("cifrado", ""), phone.get("nonce", ""), phone.get("tag", ""), Key)
+  
     form = {
         "full_name": user.get("full_name", ""),
         "email": user.get("email", ""),
-        "phone": user.get("phone", ""),
+        "phone": phone,
     }
 
     field_errors = {}  
@@ -603,7 +624,13 @@ def profile():
         for u in users:
             if (u.get("email") or "").strip().lower() == email_norm:
                 u["full_name"] = full_name
-                u["phone"] = phone
+                
+                tel_cifrado, tel_nonce, tel_tag = encrypt_aes(phone, Key)
+                u["phone"] = {
+                    "cifrado": tel_cifrado,
+                    "nonce": tel_nonce,
+                    "tag": tel_tag
+                }
 
                 if new_password:
                     new_password = hash_password(new_password)

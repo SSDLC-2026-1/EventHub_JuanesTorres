@@ -44,5 +44,23 @@
     },
     "role": "user",
     "status": "active"
+  },
+  {
+    "id": 5,
+    "full_name": "Maria LA DEL BARRIO",
+    "email": "maridel12c@gmail.com",
+    "phone": {
+      "cifrado": "cb417cbc6fccb8e3b1f9",
+      "nonce": "3e211db91a27553d74acc06e56a6e238",
+      "tag": "a2921592fe3355b5cf5f8cb1a9e1071f"
+    },
+    "password": {
+      "algorithm": "pbkdf2_sha256",
+      "iterations": 200000,
+      "salt": "295c46b8d75d5318227f7002879bbd00",
+      "hash": "8c37c1fed4f12fe1df114afa082b0baedd2da37d0b2c1094c0f3219a3660ff30"
+    },
+    "role": "user",
+    "status": "active"
   }
 ]
