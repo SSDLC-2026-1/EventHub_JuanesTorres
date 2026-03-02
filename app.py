@@ -72,8 +72,17 @@ def _user_with_defaults(u: dict) -> dict:
 
 def get_current_user() -> Optional[dict]:
     email = session.get("user_email")
+    time = session.get("login_time")
+
     if not email:
         return None
+
+    if time:
+        login_time = datetime.fromisoformat(time)
+        if datetime.now() - login_time > timedelta(minutes=3):
+            session.clear()
+            return None
+        
     return find_user_by_email(email)
 
 
@@ -339,6 +348,8 @@ def login():
 
     session["user_email"] = (user.get("email") or "").strip().lower()
     session["user_role"] = user.get("role", "user")
+
+    session["login_time"] = datetime.now().isoformat()
 
     return redirect(url_for("dashboard"))
 
