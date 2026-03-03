@@ -496,6 +496,15 @@ def checkout(event_id: int):
         billing_email=billing_email
     )
 
+    # Ofuscación del número de tarjeta
+    card_clean = clean.get("card", "")
+
+    if len(card_clean) >= 4:
+        last4 = card_clean[-4:]
+        masked_card = f"**** **** **** {last4}"
+    else:
+        masked_card = "**** **** **** ????"
+    
     email_cifrado, email_nonce, email_tag = encrypt_aes(clean.get("billing_email", ""), Key)
     e_email = {
         "cifrado": email_cifrado,
@@ -507,7 +516,7 @@ def checkout(event_id: int):
         "exp_date": clean.get("exp_date", ""),
         "name_on_card": clean.get("name_on_card", ""),
         "billing_email": e_email,
-        "card": clean.get("card", "")
+        "card": masked_card
     }
 
     if errors:
