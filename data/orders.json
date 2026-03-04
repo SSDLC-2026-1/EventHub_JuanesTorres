@@ -75,5 +75,63 @@
       },
       "card": "4111111111111111"
     }
+  },
+  {
+    "id": 5,
+    "user_email": "PLACEHOLDER@EMAIL.COM",
+    "event_id": 9,
+    "event_title": "Champions League Final Viewing",
+    "qty": 1,
+    "unit_price": 65.0,
+    "service_fee": 5.0,
+    "total": 70.0,
+    "status": "PAID",
+    "created_at": "2026-03-04T03:23:07.797005",
+    "payment": {
+      "exp_date": "09/30",
+      "name_on_card": "Alitest",
+      "billing_email": "pedro@correo.co",
+      "card": "**** **** **** 4242"
+    }
+  },
+  {
+    "id": 6,
+    "user_email": "PLACEHOLDER@EMAIL.COM",
+    "event_id": 5,
+    "event_title": "AI & Machine Learning Expo",
+    "qty": 1,
+    "unit_price": 180.0,
+    "service_fee": 5.0,
+    "total": 185.0,
+    "status": "PAID",
+    "created_at": "2026-03-04T03:30:43.249890",
+    "payment": {
+      "exp_date": "09/30",
+      "name_on_card": "Alitests",
+      "billing_email": "pedro@correo.co",
+      "card": "**** **** **** 4242"
+    }
+  },
+  {
+    "id": 7,
+    "user_email": "PLACEHOLDER@EMAIL.COM",
+    "event_id": 1,
+    "event_title": "Summer Music Fest",
+    "qty": 1,
+    "unit_price": 75.0,
+    "service_fee": 5.0,
+    "total": 80.0,
+    "status": "PAID",
+    "created_at": "2026-03-04T03:31:44.636863",
+    "payment": {
+      "exp_date": "09/30",
+      "name_on_card": "Alitests",
+      "billing_email": {
+        "cifrado": "42c44dfad77a4920c3776082cf11d4",
+        "nonce": "49f73ec9b2aed0d07fd9668cddef2e62",
+        "tag": "fab8c591ecd953fb7e451f8faa47ee82"
+      },
+      "card": "**** **** **** 4242"
+    }
   }
 ]

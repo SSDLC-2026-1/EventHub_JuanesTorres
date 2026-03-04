@@ -515,7 +515,7 @@ def checkout(event_id: int):
     form_data = {
         "exp_date": clean.get("exp_date", ""),
         "name_on_card": clean.get("name_on_card", ""),
-        "billing_email": e_email,
+        "billing_email": e_email, #con este para que se guarde cifrado el correo del comprador en la orden, aunque no se muestra descifrado en ningún lado para mantener la privacidad del usuario
         "card": masked_card
     }
 
