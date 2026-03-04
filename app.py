@@ -496,6 +496,14 @@ def checkout(event_id: int):
         billing_email=billing_email
     )
 
+    if errors:
+        return render_template(
+            "checkout.html",
+            event=event, qty=qty, subtotal=subtotal,
+            service_fee=service_fee, total=total,
+            errors=errors, form_data=clean
+        ), 400
+    
     # Ofuscación del número de tarjeta
     card_clean = clean.get("card", "")
 
@@ -518,14 +526,6 @@ def checkout(event_id: int):
         "billing_email": e_email,
         "card": masked_card
     }
-
-    if errors:
-        return render_template(
-            "checkout.html",
-            event=event, qty=qty, subtotal=subtotal,
-            service_fee=service_fee, total=total,
-            errors=errors, form_data=form_data
-        ), 400
 
     orders = load_orders()
     order_id = next_order_id(orders)
