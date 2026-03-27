@@ -1,37 +1,13 @@
-"""
-payment_validation.py
-
-Skeleton file for input validation exercise.
-You must implement each validation function according to the
-specification provided in the docstrings.
-
-All validation functions must return:
-
-    (clean_value, error_message)
-
-Where:
-    clean_value: normalized/validated value (or empty string if invalid)
-    error_message: empty string if valid, otherwise error description
-"""
-
 import re
 import unicodedata
 from datetime import datetime
-from typing import Tuple, Dict
+from typing import Dict, Tuple
 
-
-# =============================
-# Regular Patterns
-# =============================
-
-
-
-CARD_DIGITS_RE = re.compile(r"^[0-9]{13,19}$")     # digits only
-CVV_RE = re.compile(r"^[0-9]{3,4}$")             # 3 or 4 digits
-EXP_RE = re.compile(r"^(0[1-9]|1[0-2])/([0-9]{2})$")             # MM/YY format
-EMAIL_BASIC_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")    # basic email structure
-NAME_ALLOWED_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$")    # allowed name characters
-
+CARD_DIGITS_RE = re.compile(r"")     # digits only
+CVV_RE = re.compile(r"")             # 3 or 4 digits
+EXP_RE = re.compile(r"")             # MM/YY format
+EMAIL_BASIC_RE = re.compile(r"")     # basic email structure
+NAME_ALLOWED_RE = re.compile(r"")    # allowed name characters
 
 
 # =============================
@@ -39,8 +15,10 @@ NAME_ALLOWED_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-]{2,60}$")    # allow
 # =============================
 
 def normalize_basic(value: str) -> str:
-    value = unicodedata.normalize("NFKC", (value or "")).strip()
-    return value
+    """
+    Normalize input using NFKC and strip whitespace.
+    """
+    return unicodedata.normalize("NFKC", (value or "")).strip()
 
 
 def luhn_is_valid(number: str) -> bool:
@@ -56,21 +34,8 @@ def luhn_is_valid(number: str) -> bool:
         True if valid according to Luhn algorithm
         False otherwise
     """
-    if not number.isdigit():
-        return False
-
-    total = 0
-    reversed_digits = number[::-1]
-    
-    for i, char in enumerate(reversed_digits):
-        digit = int(char)
-        if (i+1) % 2 == 0:
-            digit *= 2
-            if digit > 9:
-                digit -= 9
-        total += digit
-        
-    return total % 10 == 0
+    # TODO: Implement Luhn algorithm
+    pass
 
 
 # =============================
@@ -98,16 +63,9 @@ def validate_card_number(card_number: str) -> Tuple[str, str]:
         - If invalid → return ("", "Error message")
         - If valid → return (all credit card digits, "")
     """
-    card_number = normalize_basic(card_number)
-    card_number = card_number.replace(" ", "").replace("-", "")
+    # TODO: Implement validation
+    return "", ""
 
-    if not CARD_DIGITS_RE.match(card_number):
-        return "", "Card number must contain only digits beetween 13 and 19"
-    
-    if not luhn_is_valid(card_number):
-        return "", "Card number failed Luhn validation"
-    
-    return card_number, ""
 
 def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     """
@@ -125,37 +83,27 @@ def validate_exp_date(exp_date: str) -> Tuple[str, str]:
     Returns:
         (normalized_exp_date, error_message)
     """
-    exp_date = normalize_basic(exp_date)
-
-    if not EXP_RE.match(exp_date):
-        return "", "Expiration date must be in MM/YY format with valid month"
-    
-    exp_month = int(exp_date[:2])
-    exp_year = int(exp_date[-2:])
-
-    now = datetime.utcnow()
-    year = now.year % 100
-    month = now.month
-
-    if exp_year < year or (exp_year == year and exp_month < month):
-        return "", "Card is expired D:, check the expiration date again"
-    elif exp_year > (year + 7):
-        return "", "Expiration date is unreal, are you sure the date is correct???"
-    
     # TODO: Implement validation
-    return exp_date, ""
+    return "", ""
 
 
 def validate_cvv(cvv: str) -> Tuple[str, str]:
-    
-    cvv_clean = normalize_basic(cvv)
-    
-    if not cvv_clean.isdigit():
-        return "", "CVV must contain only digits"
-    
-    if len(cvv_clean) not in (3, 4):
-        return "", "CVV must be exactly 3 or 4 digits"
-    
+    """
+    Validate CVV.
+
+    Requirements:
+    - Must contain only digits
+    - Must be exactly 3 or 4 digits
+    - Should NOT return the CVV value for storage
+
+    Input:
+        cvv (str)
+
+    Returns:
+        ("", error_message)
+        (always return empty clean value for security reasons)
+    """
+    # TODO: Implement validation
     return "", ""
 
 
@@ -174,58 +122,42 @@ def validate_billing_email(billing_email: str) -> Tuple[str, str]:
     Returns:
         (normalized_email, error_message)
     """
-    email_clean = normalize_basic(billing_email).lower()
-    
-    if len(email_clean) > 254:
-        return "", "Email must not exceed 254 characters"
-    
-    if not email_clean:
-        return "", "Email cannot be empty"
-    
-    if not EMAIL_BASIC_RE.match(email_clean):
-        return "", "Email must match basic email"
-    
-    return email_clean, ""
+    # TODO: Implement validation
+    return "", ""
 
 
 def validate_name_on_card(name_on_card: str) -> Tuple[str, str]:
-    value = normalize_basic(name_on_card)
-    value = re.sub(r"\s+", " ", value)
-    if not (2 <= len(value) <= 60):
-        return "", "Name must be between 2 and 60 characters"
-    if not NAME_ALLOWED_RE.fullmatch(value):
-        return "", "Name contains invalid characters"
-    if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", value):
-        return "", "Name must contain letters"
-    return value, ""
- #se supone que esto funciona
+    """
+    Validate name on card.
+
+    Requirements:
+    - Normalize input
+    - Collapse multiple spaces
+    - Length between 2 and 60 characters
+    - Only letters (including accents), spaces, apostrophes, hyphens
+
+    Input:
+        name_on_card (str)
+
+    Returns:
+        (normalized_name, error_message)
+    """
+    # TODO: Implement validation
+    return "", ""
+
 
 # =============================
 # Orchestrator Function
 # =============================
 
-def validate_payment_form(
-    card_number: str,
-    exp_date: str,
-    cvv: str,
-    name_on_card: str,
-    billing_email: str
-) -> Tuple[Dict, Dict]:
-    """
-    Orchestrates all field validations.
-
-    Returns:
-        clean (dict)  -> sanitized values safe for storage/use
-        errors (dict) -> field_name -> error_message
-    """
-
+def validate_payment_form(card_number: str, exp_date: str, cvv: str, name_on_card: str, billing_email: str) -> Tuple[Dict, Dict]:
     clean = {}
     errors = {}
 
-    card, err = validate_card_number(card_number)
+    last4, err = validate_card_number(card_number)
     if err:
         errors["card_number"] = err
-    clean["card"] = card
+    clean["card_last4"] = last4
 
     exp_clean, err = validate_exp_date(exp_date)
     if err:

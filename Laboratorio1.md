@@ -9,6 +9,9 @@ El objetivo de esta sección es evaluar la comprensión precisa de los conceptos
    - [X] a) Managed Access Control  
    - [ ] b) Mandatory Access Control  
    - [ ] c) Discretionary Access Control  
+   - [ ] d) Role Based Access Control
+   - [ ] b) Mandatory Access Control  
+   - [ ] c) Discretionary Access Control  
    - [ ] d) Role Based Access Control  
 
 2. **¿Qué mecanismo de seguridad implementarías para restringir el acceso de los usuarios a recursos específicos dentro de una aplicación?**

@@ -15,9 +15,10 @@ NO modificar la función encrypt_aes().
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 import hashlib
-import os
 import hmac
-
+import secrets
+import base64
+import hashlib
 # ==========================================================
 # AES-GCM (requiere pip install pycryptodome)
 # ==========================================================
@@ -60,18 +61,12 @@ def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
     """
 
     # TODO: Implementar conversión de hex a bytes
-    byte_tex_cif = bytes.fromhex(texto_cifrado_hex)
-    byte_nonce = bytes.fromhex(nonce_hex)
-    byte_tag = bytes.fromhex(tag_hex)
 
     # TODO: Crear objeto AES con nonce
-    objeto = AES.new(clave, AES.MODE_EAX, nonce=byte_nonce)
 
     # TODO: Usar decrypt_and_verify
-    texto_plano = objeto.decrypt_and_verify(byte_tex_cif, byte_tag)
 
     # TODO: Convertir resultado a string y retornar
-    return texto_plano.decode()
 
     pass
 
@@ -80,7 +75,11 @@ def decrypt_aes(texto_cifrado_hex, nonce_hex, tag_hex, clave):
 # ==========================================================
 
 
-def hash_password(password):
+DEFAULT_ITERATIONS = 310_000
+SALT_BYTES = 16
+
+
+def hash_password(password: str) -> dict:
     """
     Genera un hash seguro usando:
 
@@ -103,28 +102,18 @@ def hash_password(password):
     Pista:
         hashlib.pbkdf2_hmac(...)
     """
-    
+
     # TODO: Generar salt aleatoria
-    # Parámetros
-    algorithm = "pbkdf2_sha256"
-    iterations = 200_000
-    salt = os.urandom(16)  # 16 bytes aleatorios
 
     # TODO: Derivar clave usando pbkdf2_hmac
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations, dklen=32)
 
     # TODO: Retornar diccionario con salt y hash en formato hex
-    return {
-        "algorithm": algorithm,
-        "iterations": iterations,
-        "salt": salt.hex(),
-        "hash": dk.hex()
-    }
+
     pass
 
 
 
-def verify_password(password, stored_data):
+def verify_password(password: str, stored: dict) -> bool:
     """
     Verifica una contraseña contra el hash almacenado.
 
@@ -147,16 +136,11 @@ def verify_password(password, stored_data):
     """
 
     # TODO: Extraer salt e iterations
-    print("******",stored_data)
-    v_iterations = stored_data["iterations"]
-    v_salt_hex = stored_data["salt"]
-    v_stored_hash_hex = stored_data["hash"]
 
     # TODO: Recalcular hash
-    v_salt = bytes.fromhex(v_salt_hex)
-    new_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), v_salt, v_iterations, dklen=32)
+
     # TODO: Comparar con compare_digest
-    return hmac.compare_digest(new_hash.hex(), v_stored_hash_hex)
+
     pass
 
 
@@ -169,7 +153,7 @@ if __name__ == "__main__":
     clave = get_random_bytes(16)
 
     texto_cifrado, nonce, tag = encrypt_aes(texto, clave)
-
+    print("Texto plano: ", texto)
     print("Texto cifrado:", texto_cifrado)
     print("Nonce:", nonce)
     print("Tag:", tag)
@@ -188,5 +172,5 @@ if __name__ == "__main__":
     print("Hash generado:", pwd_data)
 
     # Cuando implementen verify_password:
-    print("Verificación correcta:",
-           verify_password("Password123!", pwd_data))
+    # print("Verificación correcta:",
+    #       verify_password("Password123!", pwd_data))
