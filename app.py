@@ -3,35 +3,43 @@ from __future__ import annotations
 import re
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 
 from flask import Flask, render_template, request, abort, url_for, redirect, session
 from pathlib import Path
-from typing import Dict, List, Optional
 import json
 
-from validation import validate_payment_form
+from validation import validate_payment_form, validate_name_on_card, validate_billing_email, normalize_basic
+from encryption import hash_password, verify_password, encrypt_aes, decrypt_aes
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.secret_key = "dev-secret-change-me"
 
+# esta función protege rutas que requieren que el usuario haya iniciado sesión.
+from functools import wraps
+def require_login(role: Optional[str] = None):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = get_current_user()
+            if not user:
+                return redirect(url_for("login"))
+
+            if role and user.get("role") != role:
+                abort(403)
+
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-EVENTS_PATH = DATA_DIR / "events.json"
-USERS_PATH = DATA_DIR / "users.json"
-ORDERS_PATH = DATA_DIR / "orders.json"
-
+EVENTS_PATH = BASE_DIR / "data" / "events.json"
+USERS_PATH = BASE_DIR / "data" / "users.json"
+ORDERS_PATH = BASE_DIR / "data" / "orders.json"
 CATEGORIES = ["All", "Music", "Tech", "Sports", "Business"]
 CITIES = ["Any", "New York", "San Francisco", "Berlin", "London", "Oakland", "San Jose"]
-
-MAX_FAILED_ATTEMPTS = 3
-LOCKOUT_SECONDS = 30
-SESSION_TIMEOUT_SECONDS = 180
-LOGIN_ATTEMPTS: Dict[str, Dict[str, int | float]] = {}
-AES_KEY = b"eventhub-lab-key"
 
 # Variables Globales y diccionario para registar los intentos de registros para el Lab1 :D
 Max_failed_attempts = 3
@@ -45,7 +53,7 @@ Key = b"LlaveGlobalDe32Bytes0123456789!!"
 class Event:
     id: int
     title: str
-    category: str
+    category: str  
     city: str
     venue: str
     start: datetime
@@ -55,31 +63,31 @@ class Event:
     banner_url: str
     description: str
 
-
-def ensure_data_files() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    for path in (EVENTS_PATH, USERS_PATH, ORDERS_PATH):
-        if not path.exists():
-            path.write_text("[]", encoding="utf-8")
-
-
 def _user_with_defaults(u: dict) -> dict:
     u = dict(u)
-    u.setdefault("role", "user")
-    u.setdefault("status", "active")
-    u.setdefault("locked_until", "")
+    u.setdefault("role", "user")      
+    u.setdefault("status", "active")  
+    u.setdefault("locked_until", "") 
     return u
 
 def get_current_user() -> Optional[dict]:
     email = session.get("user_email")
+    time = session.get("login_time")
+
     if not email:
         return None
+
+    if time:
+        login_time = datetime.fromisoformat(time)
+        if datetime.now() - login_time > timedelta(minutes=3):
+            session.clear()
+            return None
+        
     return find_user_by_email(email)
 
 
 
 def load_events() -> List[Event]:
-    ensure_data_files()
     data = json.loads(EVENTS_PATH.read_text(encoding="utf-8"))
     return [
         Event(
@@ -99,7 +107,11 @@ def load_events() -> List[Event]:
     ]
 
 
+EVENTS: List[Event] = load_events()
+
+
 def _parse_date(date_str: str) -> Optional[datetime]:
+    """Parsea fecha estilo YYYY-MM-DD. Devuelve None si inválida."""
     if not date_str:
         return None
     try:
@@ -109,6 +121,7 @@ def _parse_date(date_str: str) -> Optional[datetime]:
 
 
 def _safe_int(value: str, default: int = 1, min_v: int = 1, max_v: int = 10) -> int:
+    """Validación simple de enteros para inputs (cantidad, etc.)."""
     try:
         n = int(value)
     except (TypeError, ValueError):
@@ -116,7 +129,12 @@ def _safe_int(value: str, default: int = 1, min_v: int = 1, max_v: int = 10) -> 
     return max(min_v, min(max_v, n))
 
 
-def filter_events(q: str = "", city: str = "Any", date: Optional[datetime] = None, category: str = "All") -> List[Event]:
+def filter_events(
+    q: str = "",
+    city: str = "Any",
+    date: Optional[datetime] = None,
+    category: str = "All",
+    ) -> List[Event]:
     q_norm = (q or "").strip().lower()
     city_norm = (city or "Any").strip()
     category_norm = (category or "All").strip()
@@ -125,31 +143,41 @@ def filter_events(q: str = "", city: str = "Any", date: Optional[datetime] = Non
 
     if category_norm != "All":
         results = [e for e in results if e.category == category_norm]
+
     if city_norm != "Any":
         results = [e for e in results if e.city == city_norm]
+
     if date:
-        results = [e for e in results if e.start.date() == date.date()]
+        results = [
+            e for e in results
+            if e.start.date() == date.date()
+        ]
+
     if q_norm:
-        results = [e for e in results if q_norm in e.title.lower() or q_norm in e.venue.lower()]
+        results = [
+            e for e in results
+            if q_norm in e.title.lower() or q_norm in e.venue.lower()
+        ]
 
     results.sort(key=lambda e: e.start)
     return results
 
 
 def get_event_or_404(event_id: int) -> Event:
-    for e in load_events():
+    for e in EVENTS:
         if e.id == event_id:
             return e
     abort(404)
 
 
 def load_users() -> list[dict]:
-    ensure_data_files()
+    if not USERS_PATH.exists():
+        USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        USERS_PATH.write_text("[]", encoding="utf-8")
     return json.loads(USERS_PATH.read_text(encoding="utf-8"))
 
 
 def save_users(users: list[dict]) -> None:
-    ensure_data_files()
     USERS_PATH.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
 
@@ -158,21 +186,21 @@ def find_user_by_email(email: str) -> Optional[dict]:
     email_norm = (email or "").strip().lower()
     for u in users:
         if (u.get("email", "") or "").strip().lower() == email_norm:
-            return _user_with_defaults(u)
+            return u
     return None
 
 
 def user_exists(email: str) -> bool:
     return find_user_by_email(email) is not None
 
-
 def load_orders() -> list[dict]:
-    ensure_data_files()
+    if not ORDERS_PATH.exists():
+        ORDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ORDERS_PATH.write_text("[]", encoding="utf-8")
     return json.loads(ORDERS_PATH.read_text(encoding="utf-8"))
 
 
 def save_orders(orders: list[dict]) -> None:
-    ensure_data_files()
     ORDERS_PATH.write_text(json.dumps(orders, indent=2), encoding="utf-8")
 
 
@@ -180,57 +208,9 @@ def next_order_id(orders: list[dict]) -> int:
     return max([o.get("id", 0) for o in orders], default=0) + 1
 
 
-def get_current_user() -> Optional[dict]:
-    email = session.get("user_email")
-    if not email:
-        return None
-    return find_user_by_email(email)
-
-
-def _is_session_expired() -> bool:
-    last_seen_raw = session.get("last_seen_at")
-    last_seen = _parse_iso_datetime(last_seen_raw)
-    if not last_seen:
-        return True
-    return (_now_utc() - last_seen).total_seconds() > SESSION_TIMEOUT_SECONDS
-
-
-def require_login(view_func):
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        if not session.get("user_email"):
-            return redirect(url_for("login", next=request.path))
-        if _is_session_expired():
-            session.clear()
-            return redirect(url_for("login", expired="1"))
-        session["last_seen_at"] = _now_utc().isoformat()
-        return view_func(*args, **kwargs)
-    return wrapper
-
-
-def require_role(role_name: str):
-    def decorator(view_func):
-        @wraps(view_func)
-        @require_login
-        def wrapper(*args, **kwargs):
-            user = get_current_user()
-            if not user or (user.get("role") or "user").lower() != role_name.lower():
-                return render_template("403.html"), 403
-            return view_func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-@app.context_processor
-def inject_nav_context():
-    current_user = get_current_user()
-    return {
-        "current_user": current_user,
-        "is_authenticated": bool(current_user),
-        "is_admin": bool(current_user and (current_user.get("role") or "").lower() == "admin"),
-    }
-
-
+# -----------------------------
+# Rutas
+# -----------------------------
 @app.get("/")
 def index():
     q = request.args.get("q", "")
@@ -241,6 +221,9 @@ def index():
     date = _parse_date(date_str)
     events = filter_events(q=q, city=city, date=date, category=category)
 
+    featured = events[:3] 
+    upcoming = events[:6]
+
     return render_template(
         "index.html",
         q=q,
@@ -249,21 +232,29 @@ def index():
         category=category,
         categories=CATEGORIES,
         cities=CITIES,
-        featured=events[:3],
-        upcoming=events[:6],
+        featured=featured,
+        upcoming=upcoming,
     )
 
 
 @app.get("/event/<int:event_id>")
 def event_detail(event_id: int):
-    event = get_event_or_404(event_id)
-    similar = [e for e in load_events() if e.category == event.category and e.id != event.id][:5]
-    return render_template("event_detail.html", event=event, similar=similar)
+    event = next((e for e in load_events() if e.id == event_id), None)
+    if not event:
+        abort(404)
+
+    similar = [e for e in EVENTS if e.category == event.category and e.id != event.id][:5]
+
+    return render_template(
+        "event_detail.html",
+        event=event,
+        similar=similar,
+    )
 
 
 @app.post("/event/<int:event_id>/buy")
 def buy_ticket(event_id: int):
-    event = get_event_or_404(event_id)
+    event = get_event_or_404(event_id) 
     qty = _safe_int(request.form.get("qty", "1"), default=1, min_v=1, max_v=8)
 
     if qty > event.available_tickets:
@@ -272,7 +263,7 @@ def buy_ticket(event_id: int):
             "event_detail.html",
             event=event,
             similar=similar,
-            buy_error="Not enough tickets available for that quantity.",
+            buy_error="Not enough tickets available for that quantity."
         ), 400
 
     return redirect(url_for("checkout", event_id=event.id, qty=qty))
@@ -282,17 +273,18 @@ def buy_ticket(event_id: int):
 def login():
     if request.method == "GET":
         registered = request.args.get("registered")
-        expired = request.args.get("expired")
-        info_message = None
-        if registered == "1":
-            info_message = "Account created successfully. Please sign in."
-        elif expired == "1":
-            info_message = "Your session expired after 3 minutes of inactivity. Please sign in again."
-        return render_template("login.html", info_message=info_message, field_errors={}, form={"email": ""})
+        msg = "Account created successfully. Please sign in." if registered == "1" else None
+        return render_template("login.html", info_message=msg)
 
     email = request.form.get("email", "")
     password = request.form.get("password", "")
-    clean, field_errors = validate_login_form(email=email, password=password)
+
+    field_errors = {}
+
+    if not email.strip():
+        field_errors["email"] = "Email is required."
+    if not password.strip():
+        field_errors["password"] = "Password is required."
 
     email, err = validate_billing_email(email)
     if err:
@@ -303,7 +295,7 @@ def login():
             "login.html",
             error="Please fix the highlighted fields.",
             field_errors=field_errors,
-            form={"email": clean.get("email", email)},
+            form={"email": email},
         ), 400
     
     # Normalizamos el correo para evitar conflictos con correos con mayusculas
@@ -330,22 +322,47 @@ def login():
             F_attempst["tiempoBloqueo"] = None
 
     user = find_user_by_email(email)
-    if not user or user.get("password") != password:
-        return render_template(
-            "login.html",
-            error="Invalid credentials.",
-            field_errors={"email": " ", "password": " "},
-            form={"email": email},
-        ), 401
+    
+    # Condicional para sumar los intentos en caso de equivocarse al iniciar sesión
+    if not user or not verify_password(password, user.get("password", "")): 
+        F_attempst["intentos"] += 1
+        if F_attempst["intentos"] >= Max_failed_attempts:
+            F_attempst["tiempoBloqueo"] = datetime.utcnow() + timedelta(minutes=Lockout_duration_min)
+            return render_template(
+                "login.html",
+                error=f"Account locked due to multiple failed attempts. Try again in {Lockout_duration_min}m.",
+                field_errors={"email": " ", "password": " "},
+                form={"email": email},
+            ), 403
+        else:
+            attempts = Max_failed_attempts - F_attempst["intentos"]
+            return render_template(
+                "login.html",
+                error=f"Invalid credentials. {attempts} attempts left before lockout D:",
+                field_errors={"email": " ", "password": " "},
+                form={"email": email},
+            ), 401
+        
+    F_attempst["intentos"] = 0
+    F_attempst["tiempoBloqueo"] = None
 
     session["user_email"] = (user.get("email") or "").strip().lower()
+    session["user_role"] = user.get("role", "user")
+
+    session["login_time"] = datetime.now().isoformat()
 
     return redirect(url_for("dashboard"))
+
+@app.route("/logout") 
+def logout():
+    session.clear() 
+    return redirect(url_for("index"))
+# :p 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
-        return render_template("register.html", field_errors={}, form={}, demo_message=None, error=None)
+        return render_template("register.html")
 
     full_name = request.form.get("full_name", "")
     email = request.form.get("email", "")
@@ -353,55 +370,94 @@ def register():
     password = request.form.get("password", "")
     confirm_password = request.form.get("confirm_password", "")
 
-    if user_exists(email):
+    field_errors = {}
+
+    phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
+
+    # Validar nombre
+    full_name, err = validate_name_on_card(full_name)
+    if err: 
+        field_errors["full_name"] = err
+
+    email, err = validate_billing_email(email)
+    if err: 
+        field_errors["email"] = err
+    elif user_exists(email):
+        field_errors["email"] = "This email is already registered. Try signing in."
+
+    # Validar teléfono
+    phone = normalize_basic(phone).replace(" ", "")
+    if not phone or not phone_re.match(phone):
+        field_errors["phone"] = "Phone must contain only numbers between 7 and 15 digits."
+
+    # Validar contraseña
+    if not password:
+        field_errors["password"] = "Password is required."
+    elif len(password) < 8 or len(password) > 64:
+        field_errors["password"] = "Password must be between 8 and 64 characters."
+    elif re.search(r"\s", password):
+        field_errors["password"] = "Password cannot contain spaces."
+    elif not re.search(r"[A-Z]", password):
+        field_errors["password"] = "Password must contain at least one uppercase letter."
+    elif not re.search(r"[a-z]", password):
+        field_errors["password"] = "Password must contain at least one lowercase letter."
+    elif not re.search(r"\d", password):
+        field_errors["password"] = "Password must contain at least one number."
+    elif not re.search(r"[!@#$%^&*()\-_=+\[\]{}<>?]", password):
+        field_errors["password"] = "Password must contain at least one special character."
+    elif password == email: 
+        field_errors["password"] = "Password cannot be the same as your email."
+    elif password == full_name:
+        field_errors["password"] = "Password cannot be the same as your name."
+    elif password == phone:
+        field_errors["password"] = "Password cannot be the same as your phone number."
+    elif password != confirm_password:
+        field_errors["confirm_password"] = "Passwords are different, please check them again."
+
+    if field_errors:
         return render_template(
             "register.html",
-            error="This email is already registered. Try signing in."
+            error="Please check your information and correct the fields D:",
+            field_errors=field_errors,
+            form={"full_name": full_name, "email": email, "phone": phone} 
         ), 400
 
     users = load_users()
     next_id = (max([u.get("id", 0) for u in users], default=0) + 1)
+    h_password = hash_password(password)
+
+    tel_cifrado, tel_nonce, tel_tag = encrypt_aes(phone, Key)
+    e_phone = {
+        "cifrado": tel_cifrado,
+        "nonce": tel_nonce,
+        "tag": tel_tag
+    }
 
     users.append({
         "id": next_id,
-        "full_name": full_name,
-        "email": email,
-        "phone": phone,
-        "password": password,
+        "full_name": full_name, 
+        "email": email,         
+        "phone": e_phone,         
+        "password": h_password,
         "role": "user",          
-        "status": "active",
+        "status": "active",     
     })
 
     save_users(users)
+
     return redirect(url_for("login", registered="1"))
 
-
-@app.get("/logout")
-@require_login
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-
 @app.get("/dashboard")
+@require_login()  # Requiere sesión activa
 def dashboard():
-
 
     paid = request.args.get("paid") == "1"
     user = get_current_user()
-    orders = [o for o in load_orders() if (o.get("user_email") or "").strip().lower() == (user.get("email") or "").strip().lower()]
-    orders.sort(key=lambda o: o.get("created_at", ""), reverse=True)
-    return render_template(
-        "dashboard.html",
-        user_name=user.get("full_name") or "User",
-        paid=paid,
-        orders=orders,
-    )
-
+    return render_template("dashboard.html", user_name=(user.get("full_name") if user else "User"), paid=paid)
 
 @app.route("/checkout/<int:event_id>", methods=["GET", "POST"])
+@require_login()  # Requiere sesión activa
 def checkout(event_id: int):
-
 
     events = load_events()
     event = next((e for e in events if e.id == event_id), None)
@@ -409,9 +465,6 @@ def checkout(event_id: int):
         abort(404)
 
     qty = _safe_int(request.args.get("qty", "1"), default=1, min_v=1, max_v=8)
-
-    if qty > event.available_tickets:
-        abort(400)
 
     service_fee = 5.00
     subtotal = event.price_usd * qty
@@ -426,30 +479,29 @@ def checkout(event_id: int):
             service_fee=service_fee,
             total=total,
             errors={},
-            form_data={},
+            form_data={}
         )
 
-    clean, errors = validate_payment_form(
-        card_number=request.form.get("card_number", ""),
-        exp_date=request.form.get("exp_date", ""),
-        cvv=request.form.get("cvv", ""),
-        name_on_card=request.form.get("name_on_card", ""),
-        billing_email=request.form.get("billing_email", ""),
-    )
+    card_number = request.form.get("card_number", "")
+    exp_date = request.form.get("exp_date", "")
+    cvv = request.form.get("cvv", "")
+    name_on_card = request.form.get("name_on_card", "")
+    billing_email = request.form.get("billing_email", "")
 
-    form_data = {
-        "exp_date": clean.get("exp_date", ""),
-        "name_on_card": clean.get("name_on_card", ""),
-        "billing_email": clean.get("billing_email", ""),
-        "card": clean.get("card", "")
-    }
+    clean, errors = validate_payment_form(
+        card_number=card_number,
+        exp_date=exp_date,
+        cvv=cvv,
+        name_on_card=name_on_card,
+        billing_email=billing_email
+    )
 
     if errors:
         return render_template(
             "checkout.html",
             event=event, qty=qty, subtotal=subtotal,
             service_fee=service_fee, total=total,
-            errors=errors, form_data=form_data
+            errors=errors, form_data=clean
         ), 400
     
     # Ofuscación del número de tarjeta
@@ -477,59 +529,131 @@ def checkout(event_id: int):
 
     orders = load_orders()
     order_id = next_order_id(orders)
-    current_user = get_current_user()
-    orders.append(
-        {
-            "id": order_id,
-            "user_email": (current_user.get("email") or "").strip().lower(),
-            "event_id": event.id,
-            "event_title": event.title,
-            "qty": qty,
-            "unit_price": event.price_usd,
-            "service_fee": service_fee,
-            "total": total,
-            "status": "PAID",
-            "created_at": _now_utc().isoformat(),
-            "payment": {
-                "exp_date": clean.get("exp_date", ""),
-                "name_on_card": clean.get("name_on_card", ""),
-                "billing_email_encrypted": _encrypt_field(clean.get("billing_email", "")),
-                "card_masked": f"**** **** **** {clean.get('card_last4', '')}",
-            },
-        }
-    )
+
+    orders.append({
+        "id": order_id,
+        "user_email": "PLACEHOLDER@EMAIL.COM",
+        "event_id": event.id,
+        "event_title": event.title,
+        "qty": qty,
+        "unit_price": event.price_usd,
+        "service_fee": service_fee,
+        "total": total,
+        "status": "PAID",
+        "created_at": datetime.utcnow().isoformat(),
+        "payment": form_data
+    })
+
     save_orders(orders)
+
     return redirect(url_for("dashboard", paid="1"))
 
 
+
 @app.route("/profile", methods=["GET", "POST"])
+@require_login()  # Requiere sesión activa
 def profile():
  
-
     user = get_current_user()
     if not user:
         session.clear()
         return redirect(url_for("login"))
-
+    
+    phone = user.get("phone")
+    
+    if isinstance(phone, dict):
+        phone = decrypt_aes(phone.get("cifrado", ""), phone.get("nonce", ""), phone.get("tag", ""), Key)
+  
     form = {
         "full_name": user.get("full_name", ""),
         "email": user.get("email", ""),
-        "phone": user.get("phone", ""),
+        "phone": phone,
     }
-    field_errors: dict[str, str] = {}
+
+    field_errors = {}  
     success_msg = None
     error_msg = None
 
     if request.method == "POST":
+        full_name = request.form.get("full_name", "")
+        phone = request.form.get("phone", "")
+
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_new_password = request.form.get("confirm_new_password", "")
+
         users = load_users()
         email_norm = (user.get("email") or "").strip().lower()
 
+        phone_re = re.compile(r"^\d{7,15}$") # Condiciones para el teléfono
+
+        # Validar nombre
+        full_name, err = validate_name_on_card(full_name)
+        if err: 
+            field_errors["full_name"] = err
+        
+        # Validar Teléfono
+        phone = phone.replace(" ", "") 
+        if not phone or not phone_re.match(phone):
+            field_errors["phone"] = "Phone must contain only numbers between 7 and 15 digits."
+
+        # Validar Cambio de Contraseña
+        if current_password or new_password or confirm_new_password:
+            # Verificar contraseña actual
+            if not verify_password(current_password, user.get("password")):
+                field_errors["current_password"] = "Incorrect current password."
+            else:
+            # Validar nueva contraseña
+                if not new_password:
+                    field_errors["new_password"] = "New password is required."
+                elif len(new_password) < 8 or len(new_password) > 64:
+                    field_errors["new_password"] = "Password must be between 8 and 64 characters."
+                elif re.search(r"\s", new_password):
+                    field_errors["new_password"] = "Password cannot contain spaces."
+                elif not re.search(r"[A-Z]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one uppercase letter."
+                elif not re.search(r"[a-z]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one lowercase letter."
+                elif not re.search(r"\d", new_password):
+                    field_errors["new_password"] = "Password must contain at least one number."
+                elif not re.search(r"[!@#$%^&*()\-_=+\[\]{}<>?]", new_password):
+                    field_errors["new_password"] = "Password must contain at least one special character."
+                elif new_password == user.get("email"):
+                    field_errors["new_password"] = "New password cannot be the same as your email."
+                elif new_password == full_name:
+                    field_errors["new_password"] = "New password cannot be the same as your name."
+                elif new_password == phone:
+                    field_errors["new_password"] = "New password cannot be the same as your phone number." 
+                elif new_password == current_password:
+                    field_errors["new_password"] = "New password cannot be the same as the current password."        
+                elif new_password != confirm_new_password:
+                    field_errors["confirm_new_password"] = "New passwords do not match."
+
+        form["full_name"] = full_name
+        form["phone"] = phone
+
+        if field_errors:
+            error_msg = "Please fix the highlighted fields to update your profile."
+            return render_template(
+                "profile.html",
+                form=form,
+                field_errors=field_errors,
+                error=error_msg 
+            ), 400
+        
         for u in users:
             if (u.get("email") or "").strip().lower() == email_norm:
                 u["full_name"] = full_name
-                u["phone"] = phone
+                
+                tel_cifrado, tel_nonce, tel_tag = encrypt_aes(phone, Key)
+                u["phone"] = {
+                    "cifrado": tel_cifrado,
+                    "nonce": tel_nonce,
+                    "tag": tel_tag
+                }
 
                 if new_password:
+                    new_password = hash_password(new_password)
                     u["password"] = new_password
                 break
 
@@ -545,32 +669,39 @@ def profile():
         field_errors=field_errors,
         success_message=success_msg,
     )
+
 @app.get("/admin/users")
+@require_login(role="admin") #requiere iniciar sesión como ADMIN
 def admin_users():
+
     q = (request.args.get("q") or "").strip().lower()
     role = (request.args.get("role") or "all").strip().lower()
     status = (request.args.get("status") or "all").strip().lower()
     lockout = (request.args.get("lockout") or "all").strip().lower()
 
-    users = []
-    for raw in load_users():
-        u = _user_with_defaults(raw)
-        u["phone"] = _decrypt_phone(u)
-        users.append(u)
+    users = [_user_with_defaults(u) for u in load_users()]
 
+    # filtros
     if q:
-        users = [u for u in users if q in (u.get("full_name", "").lower()) or q in (u.get("email", "").lower())]
+        users = [
+            u for u in users
+            if q in (u.get("full_name","").lower()) or q in (u.get("email","").lower())
+        ]
+
     if role != "all":
-        users = [u for u in users if (u.get("role", "user").lower() == role)]
+        users = [u for u in users if (u.get("role","user").lower() == role)]
+
     if status != "all":
-        users = [u for u in users if (u.get("status", "active").lower() == status)]
+        users = [u for u in users if (u.get("status","active").lower() == status)]
+
     if lockout != "all":
         if lockout == "locked":
-            users = [u for u in users if _is_locked(u)[0]]
+            users = [u for u in users if (u.get("locked_until") or "").strip()]
         elif lockout == "not_locked":
-            users = [u for u in users if not _is_locked(u)[0]]
+            users = [u for u in users if not (u.get("locked_until") or "").strip()]
 
-    users.sort(key=lambda u: (u.get("full_name", "").lower(), u.get("id", 0)))
+    users.sort(key=lambda u: (u.get("full_name","").lower(), u.get("id", 0)))
+
     return render_template(
         "admin_users.html",
         users=users,
@@ -578,62 +709,30 @@ def admin_users():
         total=len(users),
     )
 
-
 @app.post("/admin/users/<int:user_id>/toggle")
-@require_role("admin")
+@require_login(role="admin")
 def admin_toggle_user(user_id: int):
     users = load_users()
-    current_user = get_current_user()
     for u in users:
         if int(u.get("id", 0)) == user_id:
-            if (u.get("email") or "").strip().lower() == (current_user.get("email") or "").strip().lower():
-                break
             u.setdefault("status", "active")
             u["status"] = "disabled" if u["status"] == "active" else "active"
             break
     save_users(users)
     return redirect(url_for("admin_users"))
 
-
 @app.post("/admin/users/<int:user_id>/role")
-@require_role("admin")
+@require_login(role="admin")
 def admin_change_role(user_id: int):
-    new_role = (request.form.get("role", "user") or "user").strip().lower()
-    if new_role not in {"user", "admin"}:
-        new_role = "user"
+    new_role = request.form.get("role", "user")
+
     users = load_users()
-    current_user = get_current_user()
     for u in users:
         if int(u.get("id", 0)) == user_id:
-            if current_user and (u.get("email") or "").strip().lower() == (current_user.get("email") or "").strip().lower() and new_role != "admin":
-                break
             u["role"] = new_role
             break
     save_users(users)
     return redirect(url_for("admin_users"))
-
-@app.get("/admin/users/list")
-def admin_list_users():
-    users = []
-    for raw in load_users():
-        u = _user_with_defaults(raw)
-        users.append({
-            "id": u.get("id"),
-            "full_name": u.get("full_name"),
-            "email": u.get("email"),
-            "role": u.get("role", "user"),
-            "status": u.get("status", "active"),
-        })
-    return {"users": users}, 200
-
-@app.errorhandler(403)
-def handle_forbidden(_error):
-    return render_template("403.html"), 403
-
-
-ensure_data_files()
-_migrate_old_orders()
-
 
 if __name__ == "__main__":
     app.run(debug=True)
