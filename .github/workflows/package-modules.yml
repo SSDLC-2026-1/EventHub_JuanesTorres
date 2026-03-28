@@ -1,0 +1,55 @@
+name: Package Modules
+
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Selecciona el módulo a empaquetar"
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+          - data
+          - full
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Crear carpeta de salida
+        run: mkdir output
+
+      # FRONTEND
+      - name: Empaquetar frontend
+        if: ${{ github.event.inputs.module == 'frontend' }}
+        run: |
+          zip -r output/frontend.zip frontend/
+
+      # BACKEND
+      - name: Empaquetar backend
+        if: ${{ github.event.inputs.module == 'backend' }}
+        run: |
+          zip -r output/backend.zip backend/
+
+      # DATA
+      - name: Empaquetar data
+        if: ${{ github.event.inputs.module == 'data' }}
+        run: |
+          zip -r output/data.zip data/
+
+      # FULL
+      - name: Empaquetar todo el proyecto
+        if: ${{ github.event.inputs.module == 'full' }}
+        run: |
+          zip -r output/full.zip . -x ".git/*" ".github/*" "output/*"
+
+      - name: Subir artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-${{ github.event.inputs.module }}
+          path: output/
