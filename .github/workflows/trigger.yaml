@@ -1,0 +1,22 @@
+name: Generate text file artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create report file
+        run: touch reporte.txt
+      - name: Write first line 
+        run: echo "Reporte generado por GitHub Actions" > reporte.txt
+      - name: Write second line
+        run: echo "Ejecucion completada correctamente" >> reporte.txt
+      - name: Show file content
+        run: cat reporte.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-artifact
+          path: reporte.txt
