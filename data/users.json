@@ -1,4 +1,4 @@
-[
+{
   {
     "id": 1,
     "full_name": "sara",
@@ -63,4 +63,4 @@
     "role": "user",
     "status": "active"
   }
-]
+}
