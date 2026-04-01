@@ -10,7 +10,13 @@
     "total": 100.0,
     "status": "PAID",
     "created_at": "2026-02-11T21:26:54.969744",
-    "payment": 
+    "payment": {
+      "card_number": "000000000000000000000",
+      "exp_date": "09/23",
+      "cvv": "123",
+      "name_on_card": "pepito",
+      "billing_email": "test@tes.com"
+    }
   },
   {
     "id": 2,
