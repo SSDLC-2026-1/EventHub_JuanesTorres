@@ -40,10 +40,12 @@ jobs:
     name: detect-secrets
     runs-on: ubuntu-latest
     steps:
+      - name: git checkout
+        uses: action/checkout@v4
       - name: set up python
         uses: action/setup-python@v5
         with:
-          python-version: "3.11
+          python-version: '3.11'
       - name: install deps
         run: |
           python -m pip install --upgrade pip
